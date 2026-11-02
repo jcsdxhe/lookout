@@ -32,8 +32,8 @@
     "typescript": "^5.9.3",
     "eslint": "10.13.0",
     "eslint-plugin-astro": "3.2.1",
-    "typescript-eslint": "8.72.0",
-    "knip": "6.42.1",
+    "typescript-eslint": "8.72.1",
+    "knip": "6.43.0",
     "dependency-cruiser": "18.7.0",
     "openapi-typescript": "7.13.0",
     "jscpd": "5.4.2"
