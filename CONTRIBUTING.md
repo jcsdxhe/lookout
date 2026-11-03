@@ -99,6 +99,10 @@ collect `backend-coverage.xml`, a Cobertura report with repository-relative file
 from the read-only, offline container without a writable host mount. CI enables
 coverage; leave the variable unset for a run without coverage.
 
+On personal forks the native job saves the XML as the `coverage-report-python`
+Actions artifact. GitHub provides code coverage publishing with Team and
+Enterprise Cloud. [GitHub coverage documentation](https://docs.github.com/en/code-security/how-tos/maintain-quality-code/set-up-code-coverage)
+
 CI reuses build layers, but runs tests on every code change. Only the document
 paths listed in `scripts/ci-scope.py` skip image checks. Release always runs them.
 Use `CI result` as the required branch check. PRs read shared caches. Only trusted

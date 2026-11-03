@@ -130,7 +130,11 @@ jobs:
           retention-days: 1
   upload-coverage-python:
     needs: native
-    if: ${{ !cancelled() && needs.native.result == 'success' && !inputs.release && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    # Personal forks retain the XML artifact. GitHub Code Quality requires an organization plan.
+    if: >-
+      ${{ !cancelled() && needs.native.result == 'success' && !inputs.release &&
+          (!github.event.repository.fork || github.event.repository.owner.type == 'Organization') &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
