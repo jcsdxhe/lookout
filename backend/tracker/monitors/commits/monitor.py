@@ -12,7 +12,7 @@ from tracker.providers.git_history import HistoryError
 __all__ = ['HOSTS', 'SCOPE', 'TITLE', 'VERSION', 'check', 'inputs', 'query_subject']
 
 TITLE = 'Upstream commits'
-VERSION = 1
+VERSION = 2
 HOSTS = {'github.com'}
 SCOPE = 'current_and_upgrade'
 

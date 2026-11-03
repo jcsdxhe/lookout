@@ -127,9 +127,12 @@ dates. It prints the same evidence contract the collector publishes.
 | RV64 ABI adjustment | Backport reference | Original |
 | RISC-V scheduling | No inclusion evidence | Original |
 
-The tests also exercise a changed rule, an interrupted scan, a rewritten branch,
-a moved or deleted tag, failed refresh retention and recovery. The API and page
-checks read a published SQLite snapshot with the Git transport disabled.
+The tests also exercise changed rules, interrupted scans, rewritten branches,
+moved or deleted tags, and recovery after a failed refresh. A separate downstream
+repository gives the same tag a different target and checks that a SHA found
+only upstream cannot identify the packaged source. Another case keeps the
+inclusion status unchanged while the two releases have different revert commits.
+The API and page checks read a published SQLite snapshot with the Git transport disabled.
 
 Package matching lives in `monitors/commits/rules.py`.
 For a new inclusion method, extend `analysis.py` and add a Git graph that distinguishes it from existing methods.
