@@ -9,14 +9,19 @@ indications differ between the packaged source and Lookout's selected upgrade.
 |---|---|
 | Original commit | The target history contains the original SHA. |
 | Equivalent patch | A target commit has the same stable Git patch ID. Follow the witness to inspect its diff. |
-| Backport to review | A target commit names the original in a cherry-pick or backport message. Its diff requires review. |
+| Backport to review | A target commit records the original on a cherry-pick or backport line. Its diff requires review. |
 | No inclusion evidence | The examined target range contains no original, equivalent patch or recognized reference. |
-| Unknown inclusion | The source identity, target ref, comparable patch or common search baseline is unavailable. The entry gives the reason. |
+| Unknown inclusion | The source identity, target ref, comparable patch or common search baseline is unavailable, or a backport cites an ambiguous short SHA. The entry gives the reason. |
 
 **Revert clue** links to an explicit revert message reachable from that target,
 within the search range. A revert can itself be reverted. Assess the resulting
 tree before making a backport or cleanup decision. RPM patch application, build
 options and runtime behavior require separate evidence.
+
+Recognized backport references include Git's `(cherry picked from commit …)` line
+and `Backport-of: …` trailers. The parser skips quoted titles and sentences
+declining a backport. For an ambiguous short SHA, follow the linked
+target commit to inspect the possible backport.
 
 ## Configure and deploy
 
@@ -85,7 +90,11 @@ beside the snapshot. Allow disk space for upstream history. Git transfers missin
 objects on subsequent polls. Collection reuses committed metadata batches and
 stable patch IDs. The discovery checkpoint advances after a complete scan.
 Changed rules or rewritten history trigger a scan from the reviewed baseline.
-Every check resolves the targets again, including moved tags.
+Every check fetches the refs and resolves both releases again. When a release
+SHA and the selected upstream SHAs are unchanged, the collector reuses that
+release's completed assessment. It revalidates abbreviated references against
+the fetched objects. A moved tag or newly ambiguous reference invalidates the
+affected assessment. A failed scan leaves the last complete checkpoint available.
 
 Each discovery increment and target search supports up to 20,000 commits.
 A larger interval fails the check so the operator can review the baseline.

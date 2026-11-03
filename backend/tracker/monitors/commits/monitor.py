@@ -2,7 +2,7 @@
 import sqlite3
 import subprocess
 
-from tracker.monitors.commits.analysis import MAX_MATCHES, assess, discover
+from tracker.monitors.commits.analysis import MAX_MATCHES, VERSION, assess, discover
 from tracker.monitors.commits.rules import candidate_identity, inputs
 from tracker.monitors.issues import INCLUSION_LABELS
 from tracker.monitors.model import evidence, finding
@@ -12,7 +12,6 @@ from tracker.providers.git_history import HistoryError
 __all__ = ['HOSTS', 'SCOPE', 'TITLE', 'VERSION', 'check', 'inputs', 'query_subject']
 
 TITLE = 'Upstream commits'
-VERSION = 2
 HOSTS = {'github.com'}
 SCOPE = 'current_and_upgrade'
 
@@ -79,7 +78,7 @@ def collect_releases(subject, settings, io):
             try:
                 if target_repo not in namespaces:
                     namespaces[target_repo] = history.fetch(target_repo)
-                tip, results = assess(history, settings, namespaces[target_repo], target, selected)
+                tip, results = assess(history, settings, namespaces[target_repo], scope, target, selected)
             except (OSError, RuntimeError, ValueError, sqlite3.Error, subprocess.SubprocessError) as error:
                 reason = str(error) if isinstance(error, HistoryError) else 'Target history could not be refreshed.'
                 checks[scope] = {'status': 'error', 'note': reason}

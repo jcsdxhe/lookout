@@ -8,7 +8,7 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import closing, contextmanager, nullcontext
 from dataclasses import asdict, dataclass
-from itertools import batched
+from itertools import batched, takewhile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -107,23 +107,34 @@ class History:
         with self.index:
             self.index.execute('INSERT OR REPLACE INTO discovery VALUES(?,?,?)', (query, head, json.dumps(matches)))
 
+    def _read_commits(self, shas) -> Iterator[Commit]:
+        raw = self.run('log', '--no-walk=unsorted', '--format=%x00%H%x00%s%x00%B', '--diff-merges=first-parent',
+                       '--root', '--no-renames', '--name-only', '-z', *shas, '--').stdout
+        # A NUL before each header terminates the path list. Paths cannot be empty
+        # or contain NUL, but titles and messages can be empty and paths can contain newlines.
+        fields = iter(raw.decode('utf-8', 'replace').removeprefix('\0').split('\0'))
+        for sha in shas:
+            if next(fields, None) != sha:
+                raise HistoryError('Git returned an incomplete or out-of-order commit batch.')
+            title, message = next(fields), next(fields)
+            paths = list(takewhile(bool, fields))
+            if paths:
+                paths[0] = paths[0].removeprefix('\n')
+            yield Commit(sha, title, message, paths)
+
     def records(self, shas) -> Iterator[Commit]:
-        # Checkpoint complete batches, including commits with no rule hit.
-        # Enumerating the current DAG drops commits abandoned by a force-push.
         for chunk in batched(shas, 32):
-            with self.index:
-                for sha in chunk:
-                    cached = self.index.execute('SELECT record FROM metadata WHERE sha=?', (sha,)).fetchone()
-                    if cached:
-                        yield Commit(**json.loads(cached[0]))
-                        continue
-                    raw = self.run('show', '--format=%s%x00%B%x00', '--diff-merges=first-parent',
-                                   '--root', '--no-renames', '--name-only', '-z', sha, '--').stdout
-                    title, message, paths = raw.decode('utf-8', 'replace').split('\0', 2)
-                    paths = paths.removeprefix('\0').removeprefix('\n').removesuffix('\0')
-                    record = Commit(sha, title, message, paths.split('\0') if paths else [])
-                    self.index.execute('INSERT INTO metadata VALUES(?,?)', (sha, json.dumps(asdict(record))))
-                    yield record
+            marks = ','.join('?' for _ in chunk)
+            cached = {sha: Commit(**json.loads(record)) for sha, record in self.index.execute(
+                f'SELECT sha,record FROM metadata WHERE sha IN ({marks})', chunk)}
+            missing = [sha for sha in dict.fromkeys(chunk) if sha not in cached]
+            if missing:
+                fresh = list(self._read_commits(missing))
+                with self.index:
+                    self.index.executemany('INSERT INTO metadata VALUES(?,?)',
+                                           ((c.sha, json.dumps(asdict(c))) for c in fresh))
+                cached.update((c.sha, c) for c in fresh)
+            yield from (cached[sha] for sha in chunk)
 
     def patch_ids(self, shas):
         """Stable nonempty single-parent/root patches. Stream diffs between Git processes."""

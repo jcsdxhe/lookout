@@ -1,5 +1,6 @@
 """Exercise the real Git graph, restartable collector and read-only package surfaces."""
 import json
+import os
 import re
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -138,12 +139,13 @@ def test_interrupted_scan_reuses_completed_batches(tmp_path, monkeypatch):
     for sequence in range(38):
         graph.commit('RISC-V change', 'counter', str(sequence))
     original = History.run
-    reads = []
+    batches = []
+    failing = True
 
     def interrupt(history, *args, **kwargs):
-        if args[0] == 'show':
-            reads.append(args[-2])
-            if len(reads) == 34:
+        if '--name-only' in args:
+            batches.append(args[args.index('-z') + 1:-1])
+            if failing and len(batches) == 2:
                 raise OSError('interrupted')
         return original(history, *args, **kwargs)
 
@@ -151,11 +153,82 @@ def test_interrupted_scan_reuses_completed_batches(tmp_path, monkeypatch):
     monkeypatch.setattr(History, 'run', interrupt)
     with pytest.raises(OSError, match='interrupted'):
         monitor.check(subject, graph.settings(), graph)
-    completed = set(reads[:32])
-    reads.clear()
+    completed = set(batches[0])
+    assert len(completed) == 32
+    failing = False
+    batches.clear()
     recovered = monitor.check(subject, graph.settings(), graph)
     assert recovered['status'] == 'ok' and len({f['id'] for f in recovered['findings']}) == 42
-    assert not completed.intersection(reads)
+    assert not completed.intersection(sha for batch in batches for sha in batch)
+
+
+def test_batched_records_preserve_order_empty_commits_and_unusual_paths(tmp_path):
+    graph = Sample(tmp_path)
+    graph.git('commit', '--allow-empty', '--allow-empty-message', '-m', '')
+    empty = graph.git('rev-parse', 'HEAD')
+    graph.git('switch', '-qc', 'topic')
+    path = '\nvector\tline\n测试.c'
+    topic = graph.commit('One subject\n\nAdditional detail', path, 'change')
+    graph.git('switch', '-q', 'main')
+    graph.git('merge', '-q', '--no-ff', 'topic', '-m', 'Merge topic')
+    merge = graph.git('rev-parse', 'HEAD')
+    requested = [empty, topic, graph.base, merge, topic]
+    with graph.git_history(URL) as history:
+        history.fetch(URL)
+        list(history.records([graph.base]))  # Mix a previously indexed SHA into the batch.
+        batch = list(history.records(requested))
+        assert [c.sha for c in batch] == requested
+        assert (batch[0].title, batch[0].message, batch[0].paths) == ('', '', [])
+        assert batch[1].title == 'One subject' and batch[1].message == 'One subject\n\nAdditional detail\n'
+        assert batch[1].paths == batch[3].paths == [path] and batch[2].paths == ['README']
+        assert list(history.records(requested)) == batch
+
+
+def test_rechecks_refs_before_reusing_release_assessments(tmp_path, monkeypatch):
+    graph = Sample(tmp_path)
+    initial = monitor.check(SUBJECT, graph.settings(), graph)
+    scans = []
+    interval = History.interval
+
+    def track_scan(history, base, tip):
+        scans.append(tip)
+        return interval(history, base, tip)
+
+    monkeypatch.setattr(History, 'interval', track_scan)
+    assert monitor.check(SUBJECT, graph.settings(), graph) == initial and not scans
+    graph.git('switch', '-q', 'stable')
+    discussed = graph.commit(f'Revert "Backport of {graph.absent}"\n\nThis was not cherry-picked from commit {graph.absent}.',
+                             'notes', 'deferred')
+    graph.git('tag', '-f', 'v1.0')
+    updated = monitor.check(SUBJECT, graph.settings(), graph)
+    assert scans == [discussed] and facts(updated, graph.absent)['inclusion'] == 'no_evidence'
+
+
+def test_new_short_sha_collision_invalidates_a_cached_backport(tmp_path):
+    graph = Sample(tmp_path)
+    # Two real Git commits with the same seven-digit prefix under the fixture's fixed author and clock.
+    tree = graph.git('hash-object', '-w', '-t', 'tree', os.devnull)
+    first, second = [graph.git('commit-tree', tree, '-m', f'RISC-V archive {n}') for n in (8222, 32864)]
+    ref = first[:7]
+    assert ref == second[:7] and first != second
+    graph.git('merge', '--allow-unrelated-histories', '--no-ff', first, '-m', 'Merge architecture work')
+    graph.git('switch', '-q', 'stable')
+    witness = graph.commit(f'Adapt scheduling\n\n(cherry picked from commit {ref})', 'schedule.c', 'adapted')
+    graph.git('tag', '-f', 'v1.0')
+    updated = monitor.check(SUBJECT, graph.settings(), graph)
+    assert facts(updated, first)['witness'] == witness and facts(updated, first)['inclusion'] == 'backport'
+    assert monitor.check(SUBJECT, graph.settings(), graph) == updated
+    graph.git('branch', 'unrelated', second)
+    uncertain = facts(monitor.check(SUBJECT, graph.settings(), graph), first)
+    assert uncertain['inclusion'] == 'unknown' and uncertain['witness'] == witness
+    assert 'uniquely' in uncertain['inclusion_reason']
+    proof = graph.commit(f'This patch was backported from commit {first}\n\nBackport-of: {first[:12]}',
+                         'notes', 'record full SHA')
+    graph.git('tag', '-f', 'v1.0')
+    repaired = monitor.check(SUBJECT, graph.settings(), graph)
+    assert facts(repaired, first)['inclusion'] == 'backport'
+    finding = next(f for f in repaired['findings'] if f['id'] == 'current:' + first)
+    assert [f['value'] for f in finding['facts'] if f['code'] == 'witness'] == [proof]
 
 
 def test_runner_storage_filters_retention_and_retry(config, snapshot, tmp_path, monkeypatch):
@@ -204,13 +277,13 @@ def test_runner_storage_filters_retention_and_retry(config, snapshot, tmp_path, 
     retry = runner.execute('commits', plan, graph, failed)
     assert retry['status'] == 'ok' and retry['failures'] == 0 and retry['checked_at'] != old
 
-    original_interval = History.interval
-    def fail_current(history, base, tip):
-        if tip == graph.revert:
+    release_commit = History.release_commit
+    def fail_current(history, namespace, ref):
+        if ref == 'refs/tags/v1.0':
             raise OSError('current target could not be read')
-        return original_interval(history, base, tip)
+        return release_commit(history, namespace, ref)
 
-    monkeypatch.setattr(History, 'interval', fail_current)
+    monkeypatch.setattr(History, 'release_commit', fail_current)
     partial = runner.execute('commits', plan, graph, saved)
     assert partial['status'] == 'partial'
     collected['monitors']['binutils']['commits'] = partial
