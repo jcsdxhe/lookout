@@ -1,6 +1,7 @@
 """Exercise the real Git graph, restartable collector and read-only package surfaces."""
 import json
 import re
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -88,6 +89,48 @@ def test_mapping_conflicts_and_missing_targets_are_explicit(tmp_path):
                     {'tag_pattern': '{version}^'}, {'paths': [], 'regex': [], 'keywords': []}):
         with pytest.raises((ValueError, re.error)):
             monitor.inputs(SUBJECT, {**reviewed, **invalid})
+
+
+def test_downstream_tag_and_sha_are_bound_to_the_source_repository(tmp_path, monkeypatch):
+    graph = Sample(tmp_path)
+    downstream = tmp_path / 'downstream.git'
+    graph.git('init', '--bare', str(downstream))
+    graph.git('push', str(downstream), graph.equal + ':refs/tags/v1.0', graph.revert + ':refs/tags/v2.0')
+    url = 'https://github.com/example/downstream'
+    history_for = graph.git_history
+
+    @contextmanager
+    def with_downstream(repository):
+        with history_for(repository) as history:
+            history.git[1:1] = ['-c', f'url.{downstream.as_uri()}.insteadOf={url}']
+            yield history
+
+    monkeypatch.setattr(graph, 'git_history', with_downstream)
+    config = {**graph.config, 'source_repository': url, 'releases': {'1.0': 'refs/tags/v1.0'}}
+    result = monitor.check(SUBJECT, monitor.inputs(SUBJECT, config), graph)
+    assert facts(result, graph.equal)['target_commit'] == graph.equal
+    assert facts(result, graph.equal, 'upgrade')['target_commit'] == graph.absent
+    for sha, expected in ((graph.cherry, graph.cherry), (graph.absent, None)):
+        source = {**SUBJECT, 'source_commit': {'repository': url, 'commit': sha}}
+        result = monitor.check(source, monitor.inputs(source, config), graph)
+        assert facts(result, graph.equal)['target_commit'] == expected
+        if expected is None:
+            assert facts(result, graph.equal)['inclusion'] == 'unknown'
+
+
+def test_candidate_filter_detects_different_reverts_with_same_inclusion(tmp_path):
+    graph = Sample(tmp_path)
+    for branch, tag in [('stable', 'v1.0'), ('main', 'v2.0')]:
+        graph.git('switch', '-q', branch)
+        graph.git('revert', '--no-edit', graph.direct)
+        graph.git('tag', '-f', tag)
+    result = monitor.check(SUBJECT, graph.settings(), graph)
+    current = facts(result, graph.direct)
+    candidate = facts(result, graph.direct, 'upgrade')
+    assert current['inclusion'] == candidate['inclusion'] == 'original'
+    assert current['revert'] != candidate['revert']
+    finding = next(f for f in result['findings'] if f['id'] == 'upgrade:' + graph.direct)
+    assert 'InclusionChanged' in finding['tags']
 
 
 def test_interrupted_scan_reuses_completed_batches(tmp_path, monkeypatch):

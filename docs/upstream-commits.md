@@ -54,6 +54,7 @@ tag in the same policy, for example `releases = { "1.2" = "refs/tags/release-1.2
 Use `source_repository` for a reviewed downstream Git tree when its release
 history lives in a different public GitHub repository. A conflicting Source0
 repository yields an unknown result. A floating branch cannot identify a release.
+A pinned SHA must be reachable from a branch or tag fetched from the source repository.
 
 Lookout's existing comparison policy selects the candidate. The monitor resolves
 the reviewed tag pattern only when that policy supplies a fresh upgrade.

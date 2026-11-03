@@ -50,7 +50,8 @@ def observation(match, scope, version, target, tip, result, settings, head, curr
     if current is not None:
         comparison = f'{current.status} → {result.status}'
         facts.append(evidence('Current → candidate', comparison, 'Lookout', target_url, code='comparison'))
-        if current.status != result.status or bool(current.reverts) != bool(result.reverts):
+        if (current.status != result.status or current.reverts != result.reverts
+                or set(current.witnesses) != set(result.witnesses)):
             tags.append('InclusionChanged')
     return finding(f"{scope}:{match['sha']}", 'UpstreamCommit', match['title'], facts, url, scope=scope,
                    tags=tags, target_version=version if scope == 'upgrade' else None)

@@ -80,6 +80,15 @@ class History:
         result = self.run('rev-parse', '--verify', '--quiet', '--end-of-options', name + '^{commit}', allow=(1,))
         return result.stdout.decode().strip() if result.returncode == 0 else None
 
+    def release_commit(self, namespace, ref):
+        tip = self.resolve(namespace, ref)
+        if tip and not ref.startswith('refs/'):
+            # The object store also holds other repositories and previously fetched refs.
+            refs = self.run('for-each-ref', '--count=1', '--format=%(refname)', '--contains=' + tip, namespace + '/')
+            if not refs.stdout:
+                return None
+        return tip
+
     def ancestor(self, first, second):
         return self.run('merge-base', '--is-ancestor', first, second, allow=(1,)).returncode == 0
 

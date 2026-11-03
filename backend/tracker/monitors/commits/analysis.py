@@ -44,7 +44,7 @@ class Assessment:
 
 
 def assess(history, settings, namespace, target, matches):
-    tip = history.resolve(namespace, target['ref']) if 'ref' in target else None
+    tip = history.release_commit(namespace, target['ref']) if 'ref' in target else None
     if tip is None:
         reason = target.get('reason', 'The mapped Git object or release tag was not found in the fetched history.')
         return None, {m['sha']: Assessment('unknown', reason) for m in matches}
