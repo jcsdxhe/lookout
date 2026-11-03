@@ -18,6 +18,7 @@ from tracker.presentation import navigation as presentation_navigation
 from tracker.presentation import pages as presentation_pages
 from tracker.presentation.model import DetailDocument, DocumentTheme, ListingDocument, Section
 from tracker.readmodel import activity
+from tracker.readmodel import commits as commit_view
 from tracker.readmodel import monitors as monitor_views
 from tracker.readmodel import snapshot as view
 from tracker.readmodel.cache import ProjectionCache
@@ -112,6 +113,7 @@ class MaintenanceLabel(BaseModel):
 class Finding(RawFinding):
     monitor: str
     stale: bool
+    checked_at: str | None = Field(None, description='Last successful observation for the release scope of this finding.')
 
 
 class ChangelogEntry(BaseModel):
@@ -416,6 +418,11 @@ class MonitorSelection(BaseModel):
         description='Repeated monitor IDs to return. Omitted means all; does not change filtering.')
 
 
+class DetailSelection(MonitorSelection):
+    commit_state: commit_view.CommitFilter | None = Field(None,
+        description='Filter matched upstream commits by current inclusion, changed candidate evidence or a target revert clue.')
+
+
 class PackageQuery(ListingQuery, MonitorSelection):
     search: Literal['name', 'observations'] = Field('name',
         description='Case-insensitive substring search. observations searches values in the focused monitor, or all monitors when unfocused; package names always match.')
@@ -567,17 +574,21 @@ def create_app(db=None):
         return {'items': [package_response(row, included, full=True) for row in rows], 'collection': collection}
 
     @app.get('/api/v2/packages/{name}', response_model=MonitoredDetail)
-    def monitor_package(name: str, filters: Annotated[MonitorSelection, Query()]):
+    def monitor_package(name: str, filters: Annotated[DetailSelection, Query()]):
         snap, index, _ = data()
         included = selected_monitors(filters.include, [module.describe() for module in monitor_views.registry(snap)])
-        package = package_response(find_package(name, index), included, full=True)
+        row = find_package(name, index)
+        if filters.commit_state and 'commits' in included and 'commits' in row['monitors']:
+            row = {**row, 'monitors': {**row['monitors'],
+                   'commits': commit_view.select(row['monitors']['commits'], filters.commit_state)}}
+        package = package_response(row, included, full=True)
         # Keep validated submodels; only the HTTP boundary serializes them.
         return MonitoredDetail(**dict(package), presentation=snap.get('presentation', {}))
 
     @app.get('/api/ui/packages/{name}', response_model=DetailDocument)
-    def package_document(name: str):
+    def package_document(name: str, commit_state: commit_view.CommitFilter | None = None):
         snap, index, collection = data()
-        document = presentation_pages.detail(find_package(name, index), collection)
+        document = presentation_pages.detail(find_package(name, index), collection, commit_state=commit_state)
         for kind in ('pr', 'issue'):
             history = activity.page(snap, name, kind)
             if history['total']:

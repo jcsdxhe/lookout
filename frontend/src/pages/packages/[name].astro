@@ -2,11 +2,11 @@
 import Base from '../../layouts/Base.astro';
 import Values from '../../components/document/Values.astro';
 import Section from '../../components/document/Section.astro';
-import {api} from '../../lib/api';
+import {api, packageDocumentURL} from '../../lib/api';
 import type {DetailDocument} from '../../lib/document';
 const name = Astro.params.name || '';
-const {data, status} = Astro.locals.detail ?? await api<DetailDocument>('/api/ui/packages/' + encodeURIComponent(name));
-if (!data) Astro.response.status = status === 404 ? 404 : 503;
+const {data, status} = Astro.locals.detail ?? await api<DetailDocument>(packageDocumentURL(name, Astro.url));
+if (!data) Astro.response.status = [404, 422].includes(status) ? status : 503;
 const topSections = data?.sections.filter(section => section.placement !== 'flow') || [];
 const flowSections = data?.sections.filter(section => section.placement === 'flow') || [];
 ---
@@ -28,6 +28,8 @@ const flowSections = data?.sections.filter(section => section.placement === 'flo
       <div class="document-sections">{flowSections.map(section => <Section section={section}/>)}</div>
 
     </div>
-  </> : <div role="alert" class="notice">{status === 404 ? 'No such source package.' : 'Snapshot unavailable. Please try again later.'}</div>}
+  </> : <div role="alert" class="notice">{status === 422
+    ? <>Unknown commit filter. <a href={'/packages/' + encodeURIComponent(name) + '#commits'}>Show all commits</a></>
+    : status === 404 ? 'No such source package.' : 'Snapshot unavailable. Please try again later.'}</div>}
   </div>
 </Base>

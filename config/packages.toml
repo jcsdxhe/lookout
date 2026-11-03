@@ -192,3 +192,22 @@ zfs = {monitors = {eol = {product = "openzfs", cycle_parts = 2}}}
 
 # strutil is bundled in the parseutil source, without its own Source tag.
 go-github-hashicorp-go-secure-stdlib = {monitors = {requires = {go = {include = [{module = "github.com/hashicorp/go-secure-stdlib/strutil", from_module = "github.com/hashicorp/go-secure-stdlib/parseutil", path = "strutil"}]}}}}
+
+# Both Source0 archives identify release tags in the repositories below.
+[libffi.monitors.commits]
+repository = "https://github.com/libffi/libffi"
+branch = "master"
+baseline = "3d0ce1e6fcf19f853894862abcbac0ae78a7be60" # v3.4.6
+tag_pattern = "v{version}"
+keywords = ["risc-v", "riscv"]
+regex = ['\brv(?:32|64)\w*']
+paths = ["src/riscv/*"]
+
+[zlib-ng.monitors.commits]
+repository = "https://github.com/zlib-ng/zlib-ng"
+branch = "develop"
+baseline = "860e4cff7917d93f54f5d7f0bc1d0e8b1a3cb988" # shared with the 2.2.5 release line
+tag_pattern = "{version}"
+keywords = ["risc-v", "riscv"]
+regex = ['\brvv\b']
+paths = ["arch/riscv/*"]

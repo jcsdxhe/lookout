@@ -1,6 +1,6 @@
 import {defineMiddleware} from 'astro:middleware';
 import {createHash} from 'node:crypto';
-import {api} from './lib/api';
+import {api, packageDocumentURL} from './lib/api';
 import type {DetailDocument, ListingDocument} from './lib/document';
 import {RenderCache, notModified} from './lib/render-cache.mjs';
 
@@ -12,7 +12,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (context.url.pathname === '/') {
       context.locals.listing = await api<ListingDocument>('/api/ui/packages' + context.url.search);
     } else if (context.params.name && /^\/packages\/[^/]+\/?$/.test(context.url.pathname)) {
-      context.locals.detail = await api<DetailDocument>('/api/ui/packages/' + encodeURIComponent(context.params.name));
+      context.locals.detail = await api<DetailDocument>(packageDocumentURL(context.params.name, context.url));
     }
     const document = context.locals.listing || context.locals.detail;
     // Hash the actual document, not generation: freshness and notices can change

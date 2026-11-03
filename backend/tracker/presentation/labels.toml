@@ -71,6 +71,31 @@ text = "Ambiguous"
 [labels."DepChanges"]
 style = "warning"
 
+[labels.UpstreamCommit]
+text = "Upstream commit"
+
+[labels.OriginalCommit]
+text = "Original commit"
+
+[labels.EquivalentPatch]
+text = "Equivalent patch"
+
+[labels.BackportReference]
+text = "Backport to review"
+
+[labels.NoInclusionEvidence]
+text = "No inclusion evidence"
+
+[labels.InclusionUnknown]
+text = "Unknown inclusion"
+
+[labels.RevertClue]
+text = "Revert clue"
+style = "warning"
+
+[labels.InclusionChanged]
+text = "Changed in candidate"
+
 [labels."Failed"]
 icon = "obs-circle-exclamation"
 style = "important"

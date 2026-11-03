@@ -203,6 +203,12 @@ class ProviderIO:
         return self.owner._read('GET', url, None, max_age=self.max_age,
                                 min_interval=min_interval, text=True, observed=self.observed)
 
+    def git_history(self, repository):
+        from tracker.providers.git_history import open_history
+
+        self.validate('GET', repository)
+        return open_history(self.owner.cache, repository, self.owner.proxy)
+
     def validate(self, method, url):
         parsed = urlsplit(url)
         if (method not in ('GET', 'POST') or parsed.scheme != 'https'

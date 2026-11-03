@@ -46,7 +46,7 @@ spec_macro_files = ["_service:obs_scm:macros.buildsystem", "_service:obs_scm:mac
 
 
 [monitors]
-enabled = ["eol", "security", "license", "yanked", "requires"]
+enabled = ["eol", "security", "license", "yanked", "requires", "commits"]
 stale_after_seconds = 86400
 batch_size = 256
 workers = 4

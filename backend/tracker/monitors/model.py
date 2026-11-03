@@ -224,6 +224,7 @@ def project(snapshot, name, now, *, version=None):
                         "tags": list(dict.fromkeys(observation_label(provider, tag) for tag in f["tags"])),
                         "id": provider + ":" + f["id"],
                         "monitor": provider,
+                        "checked_at": (scope_check if scope_check is not None else observation).get('checked_at'),
                         "stale": unavailable
                         or f['scope'] == 'upgrade' and not version.upgrading,
                     }

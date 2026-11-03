@@ -14,6 +14,9 @@ class Issue(StrEnum):
 
 VERSION_ISSUES = {'updates': Issue.OUTDATED, 'untracked': Issue.UNTRACKED}
 
+INCLUSION_LABELS = {'original': 'OriginalCommit', 'equivalent': 'EquivalentPatch', 'backport': 'BackportReference',
+                    'no_evidence': 'NoInclusionEvidence', 'unknown': 'InclusionUnknown'}
+
 _STORED_LABELS = {
     ('license', 'License'): Issue.LICENSE_DIFF,
     ('security', 'Security'): Issue.ADVISORY,

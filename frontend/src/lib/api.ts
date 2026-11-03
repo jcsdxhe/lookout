@@ -1,3 +1,8 @@
+export function packageDocumentURL(name: string, url: URL): string {
+  const state = url.searchParams.get('commit_state');
+  return '/api/ui/packages/' + encodeURIComponent(name) + (state ? '?' + new URLSearchParams({commit_state: state}) : '');
+}
+
 export function backendURL(path: string): URL {
   // Host is operator configuration, never a query parameter or request Host header.
   const base = process.env.TRACKER_API_URL || 'http://127.0.0.1:18731';

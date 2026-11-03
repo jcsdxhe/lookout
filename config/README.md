@@ -125,6 +125,8 @@ Commits do not become License/Requires upgrade-version inputs.
 
 ## Other monitor identities
 
+For Git history rules, release mappings and candidate comparison, see [Upstream commit evidence](../docs/upstream-commits.md).
+
 Registry-backed monitors reuse saved Source0 identity, then native-rule identity.
 Explicit settings take precedence. EOL needs a product and cycle policy:
 

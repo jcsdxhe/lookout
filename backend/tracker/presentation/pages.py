@@ -3,6 +3,7 @@ from tracker.monitors.issues import Issue
 from tracker.monitors.model import check_failed
 from tracker.presentation.activity import open_links
 from tracker.presentation.build import build_note
+from tracker.presentation.commits import section as commit_section
 from tracker.presentation.evidence import evidence_labels
 from tracker.presentation.labels import appearance, caption, palettes, priority
 from tracker.presentation.model import (
@@ -187,7 +188,7 @@ def _result_row(pkg, descriptors, aggregate, links):
     return Row(key=pkg['name'], cells=cells, notes=notes)
 
 
-def detail(pkg, collection=None):
+def detail(pkg, collection=None, *, commit_state=None):
     links = Links()
     source = module(pkg, 'source')
     data = source['data'] if source else {}
@@ -208,7 +209,8 @@ def detail(pkg, collection=None):
         kind = result['data']['kind']
         adapter = PRESENTERS[kind]
         destination = sections if adapter.has_results else context
-        rendered = adapter.sections(result, links)
+        rendered = (commit_section(pkg['name'], result, commit_state) if result['id'] == 'commits'
+                    else adapter.sections(result, links))
         if kind == 'version':
             current, candidate, annotations = version_parts(pkg)
             fields = [field('Current', *current)]

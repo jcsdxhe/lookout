@@ -11,6 +11,7 @@ Page and API requests read these snapshots. They do not query providers.
 | Add a package or correct its upstream identity | [Configuration](config/README.md) |
 | Change code and run checks | [Contributing](CONTRIBUTING.md) |
 | Add a monitor or provider backend | [Monitor porting](docs/monitor-porting.md) |
+| Track architecture changes and compare source releases | [Upstream commit evidence](docs/upstream-commits.md) |
 | Understand consistency and security boundaries | [Design](docs/design.md) |
 | Report an accessibility barrier | [Accessibility](ACCESSIBILITY.md) |
 
